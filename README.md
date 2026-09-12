@@ -1,82 +1,88 @@
-# Recoup: Revenue Recovery Agent
+# Recoup - Revenue Recovery Agent
 
-A full-stack, deployable version of the AI revenue recovery dashboard. The React frontend connects to a Python batch engine backend via REST API, with Gemini for AI judgment calls.
+A full-stack application for intelligent payment recovery, dunning policy simulation, and AI-assisted financial risk analysis. Recoup pairs a React and TypeScript frontend with a dual-execution recovery simulation engine (client-side in-browser and server-side Python FastAPI) alongside Gemini API integration.
 
 ## Architecture
 
 ```
 Browser
-  ├─→ GET/              Express (Node :3000)  ->  React SPA
-  ├─→ POST/api/gemini   Express               ->  Gemini REST API
-  └─→ POST/api/batch    Express               ->  Python FastAPI (:8000) -> engine
+  |-- GET  /             -> Vite / Express / Static Host -> React SPA
+  |-- POST /api/gemini   -> Gemini API Proxy (Google GenAI)
+  `-- POST /api/batch    -> Python FastAPI Service (:8001) / Fallback Engine
 ```
 
-- **Frontend** (`src/`):- React + TypeScript + Vite + Tailwind. Runs the full engine in-browser by default; can switch to Python engine mode via the "Engine" toggle in the dashboard.
-- **Backend** (`backend/`):- Pure Python 3 engine (zero stdlib dependencies). Wrapped in a thin FastAPI HTTP layer for production use.
-- **Server** (`server.ts`):- Express: serves the built SPA, proxies Gemini calls, proxies batch requests to Python.
+- **Frontend**: React, TypeScript, Vite, Tailwind CSS, Recharts, Motion, and Lucide icons.
+- **Backend API**: Express server proxying Gemini calls and batch workloads.
+- **Python Engine**: Python 3 simulation engine with FastAPI HTTP endpoints for headless batch processing.
+- **Serverless / Cloud Ready**: Configured for Vercel deployment with dedicated serverless function handlers in `/api`.
 
 ---
 
-## Quick Start - Docker Compose (Recommended)
+## Deployment on Vercel
+
+The project includes standard Vercel configuration (`vercel.json`) and serverless route handlers:
+
+1. Connect this repository to Vercel.
+2. In the Vercel Project Settings under **Environment Variables**, configure:
+   - `GEMINI_API_KEY`: Google Gemini API key.
+   - `PYTHON_API_URL` *(Optional)*: URL of a deployed Python batch service if hosting the Python backend remotely. When omitted, the platform automatically executes the simulation engine directly in the browser.
+3. Deploy. The Vite static bundle and `/api` serverless routes are built and deployed automatically.
+
+---
+
+## Local Development
+
+### Prerequisites
+- Node.js 20+
+- Python 3.10+ (optional, for running the local Python simulation backend)
+
+### 1. Environment Setup
+
+Copy the example environment configuration:
 
 ```bash
-# 1. Clone/copy this folder, then:
 cp .env.example .env
-# Edit .env and set your GEMINI_API_KEY
-
-# 2. Build and start both services
-docker compose up --build
-
-# App is live at http://localhost:3000
 ```
 
----
+Set your `GEMINI_API_KEY` in `.env`.
 
-## Manual Dev Setup
+### 2. Install and Run
 
-### Node frontend + Express server
+Run both frontend and backend concurrently:
 
-Requires **Node.js 20+**.
+```bash
+npm install
+npm run dev
+```
+
+The application will be accessible at `http://localhost:3000`.
+
+To run only the frontend:
 
 ```bash
 cd frontend
 npm install
-cp ../.env.example ../.env   # set GEMINI_API_KEY (and PYTHON_API_URL if running Python too)
-npm run dev            # starts Express + Vite HMR on http://localhost:3000
+npm run dev
 ```
 
-### Python batch engine
-
-Requires **Python 3.10+**.
+To run the Python batch service standalone:
 
 ```bash
 cd backend
 pip install -r requirements.txt
-# Set GEMINI_API_KEY in your environment (or it falls back to heuristics)
-python -m uvicorn api:app --host 0.0.0.0 --port 8000 --reload
-```
-
-Then set `PYTHON_API_URL=http://localhost:8000` in your root `.env` and restart the Node server.
-
-### Production build (no Docker)
-
-```bash
-cd frontend
-npm run build          # builds React SPA + bundles server.ts → dist/server.cjs
-NODE_ENV=production node dist/server.cjs
+python3 api.py
 ```
 
 ---
 
-## Deploying to Vercel
+## Production Build
 
-The application is pre-configured with `vercel.json` and standalone serverless API handlers in `/api`:
+To compile both the client SPA and the Node server:
 
-1. Import this repository into Vercel.
-2. In the Vercel project settings under **Environment Variables**, add:
-   - `GEMINI_API_KEY`: Your Gemini API key.
-   - `PYTHON_API_URL` *(optional)*: URL of your deployed Python batch service if hosting it separately. If omitted, Recoup automatically runs the high-performance in-browser recovery simulation engine.
-3. Deploy! Vercel will automatically build the Vite SPA and serve `/api/gemini` and `/api/batch` via serverless functions.
+```bash
+npm run build
+npm start
+```
 
 ---
 
@@ -84,33 +90,27 @@ The application is pre-configured with `vercel.json` and standalone serverless A
 
 | Variable | Required | Description |
 |---|---|---|
-| `GEMINI_API_KEY` | Yes | Gemini API key is used by Express for `/api/gemini` proxy and by Python for LLM judgment calls. |
-| `PORT` | No | Port for the Node/Express server (default: `3000`). |
-| `PYTHON_API_URL` | No | URL of the Python FastAPI service. Set to `http://localhost:8000` for local dev, or `http://api:8000` inside Docker. If unset, the "Python" engine toggle still appears but returns a graceful error and falls back to browser mode. |
+| `GEMINI_API_KEY` | Recommended | API key used for server-side Gemini intelligence calls (diagnostics, classification, copy generation). |
+| `PYTHON_API_URL` | Optional | Address of the Python FastAPI service (default for local dev: `http://localhost:8001`). If unset, client runs in-browser engine. |
+| `PORT` | Optional | Port for the Node server in containerized environments (default: `3000`). |
 
 ---
 
-## Features
+## Core Capabilities
 
-- **Landing page** -> Auth page -> Splash -> Dashboard (all existing design preserved exactly)
-- **Dashboard tabs**: Overview · Cases · Escalation Queue · Policy Engine · Policy Lab · AI Judgment Lab
-- **Engine toggle**: Run batch in-browser (JS engine, instant) or via Python (authoritative engine)
-- **AI Judgment Lab**: Three real Gemini API calls - diagnose ambiguous decline, classify B2B reply, draft outreach copy
-- **Audit exports**: Download `audit_log.json` and `cases.csv` from any batch run
-- **Docker Compose**: One-command production deployment
+- **Recovery Dashboard**: Key performance indicators, recovery rates, net financial yield, and category breakdown.
+- **Cases & Escalations**: Drill-down inspection of failed transactions, retry schedules, and human escalation queues.
+- **Policy Engine & Lab**: Dunning configuration, grace period tuning, channel mix experimentation, and batch comparisons.
+- **AI Judgment Lab**: Powered by Gemini for decline root cause diagnosis, B2B intent classification, and empathetic outreach drafting.
+- **Data Export**: Export structured audit logs (`audit_log.json`) and case reports (`cases.csv`).
 
 ---
 
-## Python batch engine (standalone)
+## Testing
 
-The Python engine can also be run independently as before:
+Run unit tests for the Python recovery engine:
 
 ```bash
 cd backend
-python3 run_batch.py --n 200 --seed 42
-# Writes output/audit_log.jsonl, output/summary.json, output/cases.csv
-
 python3 -m unittest discover -s tests -v
 ```
-
-No pip install needed. Only `backend/requirements.txt` (FastAPI + uvicorn) is needed for the HTTP wrapper.
