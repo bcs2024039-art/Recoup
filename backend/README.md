@@ -1,6 +1,6 @@
 # Revenue Recovery Agent
 
-A working prototype for **Track 03: AI Revenue Recovery** — an agent that
+A working prototype for **Track 03: AI in Accounting** (Case 5: Accounts Receivable Automation); an agent that
 detects revenue at risk, diagnoses why, decides the right (bounded,
 compliant) intervention, executes it, and proves what it recovered with a
 full audit trail.
