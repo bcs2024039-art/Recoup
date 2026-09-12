@@ -72,7 +72,7 @@ NODE_ENV=production node dist/server.cjs
 
 | Variable | Required | Description |
 |---|---|---|
-| `GEMINI_API_KEY` | Yes | Gemini API key is used by Express for `/api/gemini` proxy and by Python for LLM judgment calls. Get one free at [aistudio.google.com](https://aistudio.google.com/apikey). |
+| `GEMINI_API_KEY` | Yes | Gemini API key is used by Express for `/api/gemini` proxy and by Python for LLM judgment calls. |
 | `PORT` | No | Port for the Node/Express server (default: `3000`). |
 | `PYTHON_API_URL` | No | URL of the Python FastAPI service. Set to `http://localhost:8000` for local dev, or `http://api:8000` inside Docker. If unset, the "Python" engine toggle still appears but returns a graceful error and falls back to browser mode. |
 
