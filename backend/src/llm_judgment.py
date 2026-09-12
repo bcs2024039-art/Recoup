@@ -27,6 +27,7 @@ it is never confused with a real model call.
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import re
@@ -37,13 +38,18 @@ from .models import DiagnosisMethod, RiskEvent
 
 API_KEY = os.environ.get("GEMINI_API_KEY")
 API_URL_TEMPLATE = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
-MODEL = "gemini-3.7-flash"   # current stable/GA Gemini Flash model as of writing - check
-                             # ai.google.dev/gemini-api/docs/models before relying on this long-term
+MODEL = "gemini-flash-latest"   # current active Gemini Flash model
 
+
+_gemini_cache = {}
 
 def _call_gemini(system: str, user: str, max_tokens: int = 400) -> str | None:
     if not API_KEY:
         return None
+    cache_key = hashlib.md5((system + user).encode()).hexdigest()
+    if cache_key in _gemini_cache:
+        return _gemini_cache[cache_key]
+
     body = json.dumps({
         "systemInstruction": {"parts": [{"text": system}]},
         "contents": [{"role": "user", "parts": [{"text": user}]}],
@@ -57,13 +63,15 @@ def _call_gemini(system: str, user: str, max_tokens: int = 400) -> str | None:
         },
     )
     try:
-        with urllib.request.urlopen(req, timeout=20) as resp:
+        with urllib.request.urlopen(req, timeout=4) as resp:
             data = json.loads(resp.read())
         candidates = data.get("candidates", [])
         if not candidates:
             return None
         parts = candidates[0].get("content", {}).get("parts", [])
-        return "".join(p.get("text", "") for p in parts)
+        result = "".join(p.get("text", "") for p in parts)
+        _gemini_cache[cache_key] = result
+        return result
     except (urllib.error.URLError, urllib.error.HTTPError, TimeoutError, ValueError, OSError):
         return None
 

@@ -1,0 +1,6 @@
+{
+  "name": "Recoup",
+  "description": "An AI-powered payment continuity engine.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

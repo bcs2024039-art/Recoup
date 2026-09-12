@@ -5,14 +5,16 @@
   "workspaces": ["frontend"],
   "scripts": {
     "dev:frontend": "npm run dev --workspace=frontend",
-    "dev:python": "cd backend && python3 -m uvicorn api:app --host 0.0.0.0 --port 8001",
+    "dev:python": "cd backend && python3 api.py",
     "dev": "concurrently \"npm run dev:frontend\" \"npm run dev:python\"",
     "build": "npm run build --workspace=frontend",
+    "lint": "npm run lint --workspace=frontend",
     "start:frontend": "npm run start --workspace=frontend",
-    "start:python": "cd backend && python3 -m uvicorn api:app --host 0.0.0.0 --port 8001",
+    "start:python": "cd backend && python3 api.py",
     "start": "concurrently \"npm run start:frontend\" \"npm run start:python\""
   },
   "dependencies": {
+    "@google/genai": "^2.21.0",
     "firebase": "^12.19.0"
   }
 }

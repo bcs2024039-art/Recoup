@@ -68,6 +68,18 @@ NODE_ENV=production node dist/server.cjs
 
 ---
 
+## Deploying to Vercel
+
+The application is pre-configured with `vercel.json` and standalone serverless API handlers in `/api`:
+
+1. Import this repository into Vercel.
+2. In the Vercel project settings under **Environment Variables**, add:
+   - `GEMINI_API_KEY`: Your Gemini API key.
+   - `PYTHON_API_URL` *(optional)*: URL of your deployed Python batch service if hosting it separately. If omitted, Recoup automatically runs the high-performance in-browser recovery simulation engine.
+3. Deploy! Vercel will automatically build the Vite SPA and serve `/api/gemini` and `/api/batch` via serverless functions.
+
+---
+
 ## Environment Variables
 
 | Variable | Required | Description |

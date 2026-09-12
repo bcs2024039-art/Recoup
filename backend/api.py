@@ -126,3 +126,28 @@ def run_batch_endpoint(req: BatchRequest):
         "n": req.n,
         "results": [_serialise_result(r) for r in results],
     }
+
+
+if __name__ == "__main__":
+    import os
+    import re
+    import subprocess
+    import time
+    import uvicorn
+
+    try:
+        out = subprocess.getoutput("ss -tlpn 2>/dev/null")
+        for line in out.splitlines():
+            if ":8001" in line:
+                for p in re.findall(r"pid=(\d+)", line):
+                    pid = int(p)
+                    if pid != os.getpid():
+                        try:
+                            os.kill(pid, 9)
+                        except ProcessLookupError:
+                            pass
+        time.sleep(0.3)
+    except Exception as e:
+        print("Port cleanup warning:", e)
+
+    uvicorn.run(app, host="0.0.0.0", port=8001, log_level="info")

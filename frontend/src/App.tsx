@@ -35,7 +35,8 @@ function mulberry32(seed) {
   };
 }
 class RNG {
-  constructor(seed) { this._r = mulberry32(seed); }
+  private _r: () => number;
+  constructor(seed: number) { this._r = mulberry32(seed); }
   random() { return this._r(); }
   randint(min, max) { return Math.floor(this.random() * (max - min + 1)) + min; }
   choice(arr) { return arr[Math.floor(this.random() * arr.length)]; }
@@ -550,7 +551,7 @@ function runBatch(events, seed, config = DEFAULT_POLICY_CONFIG) {
     }
   }
 
-  return Object.values(states).map((s) => ({
+  return Object.values(states).map((s: any) => ({
     event: s.event, status: s.status, attempts: s.attempts,
     amountRecovered: s.amountRecovered, totalCost: s.totalCost, escalationCost: s.escalationCost,
   }));
@@ -638,8 +639,8 @@ function computeRecoveryByAttempt(results) {
       }
     }
   }
-  return Object.entries(byAttempt).sort((x, y) => Number(x[0]) - Number(y[0]))
-    .map(([k, v]) => ({ name: `Attempt ${k}`, Recovered: Math.round(v.recovered), Cases: v.count }));
+  return Object.entries(byAttempt).sort((x: any, y: any) => Number(x[0]) - Number(y[0]))
+    .map(([k, v]: [string, any]) => ({ name: `Attempt ${k}`, Recovered: Math.round(v.recovered), Cases: v.count }));
 }
 function computeHourHistogram(results) {
   const hours = Array.from({ length: 24 }, (_, h) => ({ hour: h, count: 0 }));
@@ -688,14 +689,11 @@ function downloadCasesCSV(results) {
 }
 
 /* ======================================================================
-   GEMINI API - real calls, used only in the AI Judgment Lab tab. Unlike
-   Claude-in-artifact calls, there's no built-in key injection here, so
-   this is a bring-your-own-key flow: the key lives only in React state
-   (never persisted, never sent anywhere but Google's endpoint) and the
-   model string is user-editable since the Gemini lineup moves fast -
-   gemini-3.7-flash is current and GA as of this writing.
+   GEMINI API - real calls proxied through server-side /api/gemini endpoint.
+   API keys are secured server-side in environment variables and never
+   exposed to client code or browser storage.
    ====================================================================== */
-const GEMINI_DEFAULT_MODEL = "gemini-3.7-flash";
+const GEMINI_DEFAULT_MODEL = "gemini-3.8-flash";
 async function callGemini(model, system, user, maxTokens = 350) {
   const res = await fetch(`/api/gemini`, {
     method: "POST",
@@ -752,8 +750,8 @@ function AnimatedNumber({ value, prefix = "", suffix = "" }) {
   return <motion.span>{display}</motion.span>;
 }
 
-function KPICard({ icon: Icon, label, value, prefix, suffix, sub, tone = "stone" }) {
-  const toneMap = { stone: "text-stone-100", emerald: "text-emerald-500", rose: "text-rose-500", amber: "text-amber-500" };
+function KPICard({ icon: Icon, label, value, prefix = "", suffix = "", sub = "", tone = "stone" }: { icon: any; label: string; value: number; prefix?: string; suffix?: string; sub?: string; tone?: string }) {
+  const toneMap: Record<string, string> = { stone: "text-stone-100", emerald: "text-emerald-500", rose: "text-rose-500", amber: "text-amber-500" };
   return (
     <div className="bg-stone-900 border border-stone-800 p-5">
       <div className="flex items-center gap-2 text-stone-400 mb-3">
@@ -855,19 +853,19 @@ function CaseDetailModal({ result, onClose }) {
 /* ======================================================================
    DASHBOARD TAB
    ====================================================================== */
-const staggerContainer = {
+const staggerContainer: any = {
   hidden: { opacity: 0 },
   show: { opacity: 1, transition: { staggerChildren: 0.1 } }
 };
-const dropIn = {
+const dropIn: any = {
   hidden: { opacity: 0, y: 20 },
-  show: { opacity: 1, y: 0, transition: { ease: "easeOut", duration: 0.4 } }
+  show: { opacity: 1, y: 0, transition: { duration: 0.4 } }
 };
 
-function DashboardTab({ results }) {
+function DashboardTab({ results }: { results: any }) {
   const stats = useMemo(() => {
     const overall = { atRisk: 0, recovered: 0, escalated: 0, optedOut: 0, cost: 0 };
-    const byCat = {};
+    const byCat: Record<string, any> = {};
     for (const cat of Object.keys(CATEGORY_LABEL)) byCat[cat] = { atRisk: 0, recovered: 0, count: 0 };
     for (const r of results) {
       overall.atRisk += r.event.amount;
@@ -886,7 +884,7 @@ function DashboardTab({ results }) {
   const maxHourCount = Math.max(1, ...hourHistogram.map((h) => h.count));
   const rate = stats.overall.atRisk ? (100 * stats.overall.recovered / stats.overall.atRisk) : 0;
 
-  const chartData = Object.entries(stats.byCat).map(([cat, v]) => ({
+  const chartData = Object.entries(stats.byCat).map(([cat, v]: [string, any]) => ({
     name: CATEGORY_LABEL[cat].replace(" failure", "").replace(" abandonment", "").replace(" overdue", ""),
     "At risk": Math.round(v.atRisk), "Recovered": Math.round(v.recovered),
   }));
@@ -1089,7 +1087,7 @@ function EscalationQueueTab({ results, onSelect }) {
     <div className="space-y-5">
       
 
-      {Object.entries(groups).map(([code, g]) => {
+      {Object.entries(groups).map(([code, g]: [string, any]) => {
         const Icon = groupIcon[code] || AlertTriangle;
         return (
           <div key={code} className="bg-stone-900 border border-stone-800 rounded-xl overflow-hidden">
@@ -1134,7 +1132,7 @@ function EscalationQueueTab({ results, onSelect }) {
    ====================================================================== */
 function PolicyEngineTab({ results, onSelect }) {
   const stats = useMemo(() => computeRuleStats(results), [results]);
-  const totalChecks = Object.values(stats).reduce((s, v) => s + v.evaluated, 0);
+  const totalChecks = Object.values(stats).reduce((s: number, v: any) => s + v.evaluated, 0);
 
   return (
     <div className="space-y-4">
@@ -1232,7 +1230,7 @@ function PolicyLabTab() {
 
   const segCls = (active) => `px-3 py-1.5 rounded-lg text-xs font-mono transition ${active ? "bg-amber-500 text-stone-950 font-semibold" : "bg-stone-900 text-stone-400 border border-stone-800 hover:border-stone-600"}`;
 
-  const Row = ({ label, a, b, fmt = (v) => v, deltaFmt }) => {
+  const Row = ({ label, a, b, fmt = (v: any) => v, deltaFmt }: { label: any; a: any; b: any; fmt?: (v: any) => any; deltaFmt?: (d: any) => any }) => {
     const delta = b - a;
     return (
       <div className="grid grid-cols-4 gap-2 py-2 border-b border-stone-800/60 last:border-0 text-sm">
@@ -1333,35 +1331,6 @@ function ResultBox({ state }) {
   if (state.error) return <div className="flex items-start gap-2 text-rose-400 text-xs mt-3 bg-rose-500/10 rounded-lg p-2.5"><AlertTriangle size={14} className="shrink-0 mt-0.5" /><span>{state.error}</span></div>;
   if (state.data) return <div className="mt-3 bg-stone-950 border border-stone-800 rounded-lg p-3 text-xs text-stone-300 font-mono whitespace-pre-wrap leading-relaxed">{state.data}</div>;
   return null;
-}
-
-function GeminiKeyPanel({ apiKey, setApiKey, model, setModel }) {
-  const [showKey, setShowKey] = useState(false);
-  const hasKey = apiKey.trim().length > 0;
-  return (
-    <div className="bg-stone-900 border border-stone-800 rounded-xl p-4 sm:p-5">
-      <div className="flex items-center gap-2 mb-1.5"><KeyRound size={16} className="text-amber-500" /><h3 className="font-bold text-stone-100 text-sm">Connect your Gemini API key</h3></div>
-      <p className="text-xs text-stone-400 mb-3 leading-relaxed">
-        The three cards below call the real Gemini API directly from your browser - bring your own key. It&rsquo;s kept only in this
-        page&rsquo;s memory for this session, used solely for these calls, and never sent anywhere but Google&rsquo;s endpoint. Get a free one at{" "}
-        <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer" className="text-amber-500 hover:underline inline-flex items-center gap-0.5">Google AI Studio<ExternalLink size={10} /></a>.
-      </p>
-      <div className="flex flex-wrap gap-2">
-        <div className="relative flex-1 basis-64">
-          <input type={showKey ? "text" : "password"} value={apiKey} onChange={(e) => setApiKey(e.target.value)}
-            placeholder="AIza..." spellCheck={false}
-            className="w-full bg-stone-950 border border-stone-700 rounded-lg pl-3 pr-14 py-2 text-sm text-stone-200 font-mono focus:outline-none focus:border-amber-500" />
-          <button onClick={() => setShowKey((s) => !s)} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] font-mono text-stone-400 hover:text-stone-400">{showKey ? "HIDE" : "SHOW"}</button>
-        </div>
-        <input value={model} onChange={(e) => setModel(e.target.value)} placeholder={GEMINI_DEFAULT_MODEL} spellCheck={false}
-          className="w-44 bg-stone-950 border border-stone-700 rounded-lg px-3 py-2 text-sm text-stone-200 font-mono focus:outline-none focus:border-amber-500" />
-      </div>
-      <div className={`text-[11px] mt-2 flex items-center gap-1 ${hasKey ? "text-emerald-400" : "text-stone-400"}`}>
-        {hasKey ? <CheckCircle2 size={11} /> : <Info size={11} />}
-        {hasKey ? "Key set - the cards below are ready to call Gemini." : "No key yet - the cards below will prompt for one when clicked."}
-      </div>
-    </div>
-  );
 }
 
 function AIJudgmentLab({ results: batchResults = null }: { results?: any[] | null }) {
