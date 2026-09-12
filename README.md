@@ -1,4 +1,4 @@
-# Recoup - Revenue Recovery Agent
+# Recoup: Revenue Recovery Agent
 
 A full-stack application for intelligent payment recovery, dunning policy simulation, and AI-assisted financial risk analysis. Recoup pairs a React and TypeScript frontend with a dual-execution recovery simulation engine (client-side in-browser and server-side Python FastAPI) alongside Gemini API integration.
 
@@ -6,15 +6,15 @@ A full-stack application for intelligent payment recovery, dunning policy simula
 
 ```
 Browser
-  |-- GET  /             -> Vite / Express / Static Host -> React SPA
-  |-- POST /api/gemini   -> Gemini API Proxy (Google GenAI)
-  `-- POST /api/batch    -> Python FastAPI Service (:8001) / Fallback Engine
+  |-- GET/             -> Vite/Express/Static Host->React SPA
+  |-- POST/api/gemini  -> Gemini API Proxy (Google GenAI)
+  `-- POST/api/batch   -> Python FastAPI Service (:8001)/Fallback Engine
 ```
 
 - **Frontend**: React, TypeScript, Vite, Tailwind CSS, Recharts, Motion, and Lucide icons.
 - **Backend API**: Express server proxying Gemini calls and batch workloads.
 - **Python Engine**: Python 3 simulation engine with FastAPI HTTP endpoints for headless batch processing.
-- **Serverless / Cloud Ready**: Configured for Vercel deployment with dedicated serverless function handlers in `/api`.
+- **Serverless/Cloud Ready**: Configured for Vercel deployment with dedicated serverless function handlers in `/api`.
 
 ---
 
