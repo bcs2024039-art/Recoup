@@ -8,5 +8,8 @@
     "build": "npm run build --workspace=frontend",
     "lint": "npm run lint --workspace=frontend",
     "start": "npm run start --workspace=frontend"
+  },
+  "dependencies": {
+    "@google/genai": "^2.21.0"
   }
 }
