@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "buildCommand": "npm run build --workspace=frontend",
+  "buildCommand": "npm run build",
   "outputDirectory": "frontend/dist",
   "rewrites": [
     {
