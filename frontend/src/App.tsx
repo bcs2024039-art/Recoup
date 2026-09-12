@@ -18,7 +18,7 @@ import {
   AlertTriangle, CheckCircle2, ShieldAlert, Sparkles, X, Play, RefreshCw,
   IndianRupee, MessageSquare, CreditCard, ShoppingCart, Landmark, Loader2, Info, ChevronRight,
   Clock, Download, Search, ArrowUpDown, ListChecks, UserCheck, KeyRound, ExternalLink,
-  FlaskConical, Scale, ArrowRight,
+  FlaskConical, Scale, ArrowRight, Copy, Check,
 } from "lucide-react";
 
 /* ======================================================================
@@ -694,7 +694,7 @@ function downloadCasesCSV(results) {
    exposed to client code or browser storage.
    ====================================================================== */
 const GEMINI_DEFAULT_MODEL = "gemini-3.8-flash";
-async function callGemini(model, system, user, maxTokens = 350) {
+async function callGemini(model, system, user, maxTokens = 1500) {
   const res = await fetch(`/api/gemini`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -709,7 +709,12 @@ async function callGemini(model, system, user, maxTokens = 350) {
   if (!data.text) throw new Error("Empty response from API");
   return data.text;
 }
-function stripFences(t) { return t.trim().replace(/^```(json)?/i, "").replace(/```$/, "").trim(); }
+function stripFences(t) {
+  if (!t) return "";
+  let clean = t.trim();
+  clean = clean.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "").trim();
+  return clean;
+}
 
 /* ======================================================================
    FORMATTING HELPERS
@@ -1325,11 +1330,46 @@ function LabCard({ icon: Icon, title, blurb, children }) {
     </div>
   );
 }
-function ResultBox({ state }) {
+function ResultBox({ state }: { state?: any }) {
+  const [copied, setCopied] = useState(false);
   if (!state) return null;
-  if (state.loading) return <div className="flex items-center gap-2 text-stone-400 text-xs mt-3"><Loader2 size={14} className="animate-spin" /> Calling Gemini...</div>;
-  if (state.error) return <div className="flex items-start gap-2 text-rose-400 text-xs mt-3 bg-rose-500/10 rounded-lg p-2.5"><AlertTriangle size={14} className="shrink-0 mt-0.5" /><span>{state.error}</span></div>;
-  if (state.data) return <div className="mt-3 bg-stone-950 border border-stone-800 rounded-lg p-3 text-xs text-stone-300 font-mono whitespace-pre-wrap leading-relaxed">{state.data}</div>;
+  if (state.loading) return (
+    <div className="flex items-center gap-2 text-stone-400 text-xs mt-3 bg-stone-950/70 border border-stone-800 rounded-lg p-3">
+      <Loader2 size={14} className="animate-spin text-amber-500" /> Calling Gemini...
+    </div>
+  );
+  if (state.error) return (
+    <div className="flex items-start gap-2 text-rose-400 text-xs mt-3 bg-rose-500/10 border border-rose-500/20 rounded-lg p-3 leading-relaxed">
+      <AlertTriangle size={14} className="shrink-0 mt-0.5" />
+      <span>{state.error}</span>
+    </div>
+  );
+  if (state.data) {
+    const handleCopy = () => {
+      navigator.clipboard.writeText(state.data);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    };
+
+    return (
+      <div className="mt-3 relative bg-stone-950 border border-stone-800 rounded-lg p-3.5 text-xs text-stone-300 font-mono whitespace-pre-wrap break-words leading-relaxed max-h-[380px] overflow-y-auto">
+        <div className="flex items-center justify-between border-b border-stone-800/80 pb-2 mb-2 text-[11px] font-sans text-stone-400">
+          <span className="text-stone-300 font-medium">Gemini Output</span>
+          <button
+            onClick={handleCopy}
+            className="px-2 py-1 rounded bg-stone-900 hover:bg-stone-800 text-stone-300 hover:text-white border border-stone-700/60 transition flex items-center gap-1.5"
+            title="Copy entire response"
+          >
+            {copied ? <Check size={12} className="text-emerald-400" /> : <Copy size={12} />}
+            <span>{copied ? "Copied" : "Copy"}</span>
+          </button>
+        </div>
+        <div className="text-stone-200">
+          {state.data}
+        </div>
+      </div>
+    );
+  }
   return null;
 }
 
@@ -1337,8 +1377,8 @@ function AIJudgmentLab({ results: batchResults = null }: { results?: any[] | nul
   const [model, setModel] = useState(GEMINI_DEFAULT_MODEL);
   const [results, setResults] = useState<any>({});
 
-  const run = useCallback(async (id: string, system: string, user: string, maxTokens: number, formatter?: (r: string) => string) => {
-    setResults((p: any) => ({ ...p, [id]: { loading: true } }));
+  const run = useCallback(async (id: string, system: string, user: string, maxTokens: number = 1500, formatter?: (r: string) => string) => {
+    setResults((p: any) => ({ ...p, [id]: { loading: true, error: null } }));
     try {
       const raw = await callGemini(model.trim() || GEMINI_DEFAULT_MODEL, system, user, maxTokens);
       setResults((p: any) => ({ ...p, [id]: { data: formatter ? formatter(raw) : raw } }));
@@ -1349,48 +1389,137 @@ function AIJudgmentLab({ results: batchResults = null }: { results?: any[] | nul
 
   const formatJSON = (raw: string) => {
     try {
-      const parsed = JSON.parse(stripFences(raw));
+      const cleaned = stripFences(raw);
+      const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
+      const targetStr = jsonMatch ? jsonMatch[0] : cleaned;
+      const parsed = JSON.parse(targetStr);
       return Object.entries(parsed).map(([k, v]) => {
         const key = humanize(k);
-        const val = typeof v === "number" ? (k === "confidence" ? `${(v * 100).toFixed(0)}%` : v) : (typeof v === "string" ? humanize(v) : String(v));
+        const val = typeof v === "number" 
+          ? (k === "confidence" ? `${(v * 100).toFixed(0)}%` : v) 
+          : (typeof v === "string" ? humanize(v) : (Array.isArray(v) ? v.join(", ") : JSON.stringify(v)));
         return `${key}: ${val}`;
       }).join("\n");
-    } catch { return raw; }
+    } catch {
+      return raw;
+    }
   };
 
   const cases = batchResults || [];
 
-  // Scenario A - diagnose an ambiguous repeated decline
-  const promptA = useMemo(() => {
-    let match = cases.find(c => c.event.category === "payment_failure" && c.attempts.some((a: any) => a.diagnosis?.method === "llm_fallback_heuristic"));
-    if (!match) {
-      match = cases.find(c => c.event.category === "payment_failure" && c.event.signal?.declineCode === "do_not_honor" && c.attempts.length >= 2);
-    }
-    if (match) {
-      const tenure = match.event.signal?.customerTenureMonths || 0;
-      const amount = match.event.amount;
-      const attempts = match.attempts.length;
-      const gateway = match.event.signal?.gateway || "Razorpay";
-      const code = match.event.signal?.declineCode || "do_not_honor";
+  // Scenario A - Case selection for diagnosis
+  const [selectedCaseIdA, setSelectedCaseIdA] = useState<string>("auto");
+  const [customA, setCustomA] = useState({
+    tenure: 14,
+    amount: 2999,
+    declineCode: "do_not_honor",
+    attempts: 3,
+    gateway: "Razorpay"
+  });
+
+  const paymentCases = useMemo(() => cases.filter(c => c.event.category === "payment_failure"), [cases]);
+  const otherCases = useMemo(() => cases.filter(c => c.event.category !== "payment_failure"), [cases]);
+
+  const resolvedCaseA = useMemo(() => {
+    if (selectedCaseIdA === "custom") {
       return {
-         text: `Customer tenure: ${tenure} months. Plan amount: INR ${amount.toFixed(0)}. Decline code: ${code}, repeated across ${attempts} attempts. Gateway: ${gateway}.`,
-         id: match.event.id
+        isCustom: true,
+        id: "custom",
+        customerName: "Custom Test Case",
+        tenure: customA.tenure,
+        amount: customA.amount,
+        attempts: customA.attempts,
+        gateway: customA.gateway,
+        code: customA.declineCode,
+        status: "active"
       };
     }
+
+    if (selectedCaseIdA !== "auto") {
+      const found = cases.find(c => c.event.id === selectedCaseIdA);
+      if (found) {
+        return {
+          isCustom: false,
+          id: found.event.id,
+          customerName: found.event.customerName,
+          tenure: found.event.signal?.customerTenureMonths || 0,
+          amount: found.event.amount,
+          attempts: found.attempts.length || 1,
+          gateway: found.event.signal?.gateway || "Razorpay",
+          code: found.event.signal?.declineCode || "do_not_honor",
+          status: found.status
+        };
+      }
+    }
+
+    // Auto-selection heuristic
+    let match = paymentCases.find(c => c.attempts.some((a: any) => a.diagnosis?.method === "llm_fallback_heuristic"));
+    if (!match) {
+      match = paymentCases.find(c => c.event.signal?.declineCode === "do_not_honor" && c.attempts.length >= 2);
+    }
+    if (!match && paymentCases.length > 0) {
+      match = paymentCases[0];
+    }
+
+    if (match) {
+      return {
+        isCustom: false,
+        id: match.event.id,
+        customerName: match.event.customerName,
+        tenure: match.event.signal?.customerTenureMonths || 0,
+        amount: match.event.amount,
+        attempts: match.attempts.length || 1,
+        gateway: match.event.signal?.gateway || "Razorpay",
+        code: match.event.signal?.declineCode || "do_not_honor",
+        status: match.status
+      };
+    }
+
     return {
-      text: "Customer tenure: 14 months. Plan amount: INR 2999. Decline code: do_not_honor, repeated across 3 attempts. Gateway: Razorpay.",
-      id: null
+      isCustom: true,
+      id: null,
+      customerName: "Sample Customer",
+      tenure: 14,
+      amount: 2999,
+      attempts: 3,
+      gateway: "Razorpay",
+      code: "do_not_honor",
+      status: "active"
     };
-  }, [cases]);
+  }, [cases, paymentCases, selectedCaseIdA, customA]);
+
+  const promptA = useMemo(() => {
+    return {
+      text: `Customer: ${resolvedCaseA.customerName}. Customer tenure: ${resolvedCaseA.tenure} months. Plan amount: INR ${resolvedCaseA.amount.toFixed(0)}. Decline code: ${resolvedCaseA.code}, repeated across ${resolvedCaseA.attempts} attempts. Gateway: ${resolvedCaseA.gateway}.`,
+      id: resolvedCaseA.id
+    };
+  }, [resolvedCaseA]);
 
   const runA = () => run("a",
     'You are a payments risk analyst. Given a repeating ambiguous card decline pattern, decide whether to keep retrying automatically, ask the customer to update their card, or escalate to a human. Respond ONLY with JSON, no other text, no markdown fences: {"root_cause": str, "confidence": float 0-1, "rationale": str (<=30 words), "recommended_action": "retry_payment"|"request_card_update"|"escalate_human", "never_retry": bool, "needs_human": bool}',
     promptA.text,
-    400, formatJSON);
+    1500, formatJSON);
 
   // Scenario B - classify a B2B reply
+  const [selectedCaseIdB, setSelectedCaseIdB] = useState<string>("auto");
+  const [customReplyText, setCustomReplyText] = useState("Facing a temporary cash crunch, can we get 15 more days? We've always paid on time before.");
+
+  const receivableCases = useMemo(() => cases.filter(c => c.event.category === "receivable_overdue"), [cases]);
+
   const promptB = useMemo(() => {
-    const match = cases.find(c => c.event.category === "receivable_overdue" && c.event.signal?.customerReplyText);
+    if (selectedCaseIdB === "custom") {
+      return { text: customReplyText, id: null };
+    }
+    if (selectedCaseIdB !== "auto") {
+      const found = cases.find(c => c.event.id === selectedCaseIdB);
+      if (found) {
+        return {
+          text: found.event.signal?.customerReplyText || `Requesting extension for invoice due on ${found.event.customerName}'s account.`,
+          id: found.event.id
+        };
+      }
+    }
+    const match = receivableCases.find(c => c.event.signal?.customerReplyText);
     if (match) {
       return {
         text: match.event.signal.customerReplyText,
@@ -1401,28 +1530,37 @@ function AIJudgmentLab({ results: batchResults = null }: { results?: any[] | nul
       text: "Facing a temporary cash crunch, can we get 15 more days? We've always paid on time before.",
       id: null
     };
-  }, [cases]);
+  }, [cases, receivableCases, selectedCaseIdB, customReplyText]);
 
   const runB = () => run("b",
     'Classify a B2B accounts-receivable customer reply. Respond ONLY with JSON, no other text, no markdown fences: {"intent": "promise_to_pay"|"dispute"|"hardship"|"other", "confidence": float 0-1, "rationale": str (<=25 words), "promised_date_hint": str or null}',
     promptB.text,
-    300, formatJSON);
+    1500, formatJSON);
 
   // Scenario C - draft a message, with live controls
   const [tone, setTone] = useState(2);
   const [locale, setLocale] = useState("en");
   const [cat, setCat] = useState("receivable_overdue");
+  const [selectedCaseIdC, setSelectedCaseIdC] = useState<string>("auto");
   
+  const categoryCases = useMemo(() => cases.filter(c => c.event.category === cat), [cases, cat]);
+
   const promptC = useMemo(() => {
-    const match = cases.find(c => c.event.category === cat);
+    let match: any = null;
+    if (selectedCaseIdC !== "auto") {
+      match = cases.find(c => c.event.id === selectedCaseIdC);
+    } else {
+      match = categoryCases[0] || null;
+    }
+
     if (match) {
       const e = match.event;
       let detail = "";
       let reason = "";
-      if (cat === "payment_failure") {
+      if (e.category === "payment_failure") {
         detail = e.signal?.subscriptionPlan || "subscription";
         reason = (e.signal?.declineCode || "failed").replace(/_/g, " ");
-      } else if (cat === "checkout_abandonment") {
+      } else if (e.category === "checkout_abandonment") {
         detail = `${e.signal?.cartItemCount || 1} items`;
         reason = `cart abandoned at ${e.signal?.dropoffStage || "checkout"}`;
       } else {
@@ -1434,7 +1572,8 @@ function AIJudgmentLab({ results: batchResults = null }: { results?: any[] | nul
         amount: e.amount,
         detail,
         reason,
-        id: e.id
+        id: e.id,
+        category: e.category
       };
     }
     const sampleByCat: any = {
@@ -1442,55 +1581,224 @@ function AIJudgmentLab({ results: batchResults = null }: { results?: any[] | nul
       checkout_abandonment: { name: "Meera", amount: 4200, detail: "3 items", reason: "cart abandoned at payment details" },
       receivable_overdue: { name: "Kestrel Foods", amount: 185000, detail: "45 days overdue", reason: "firm-stage follow-up" },
     };
-    return { ...sampleByCat[cat], id: null };
-  }, [cases, cat]);
+    return { ...sampleByCat[cat], id: null, category: cat };
+  }, [cases, categoryCases, cat, selectedCaseIdC]);
 
   const runC = () => {
     run("c",
       "Write a short (<=45 words), respectful revenue-recovery outreach message for a customer. Never sound threatening, always offer help. Match the requested tone tier and language. Respond with the message text only - no preamble, no quotes, no markdown.",
-      `Category: ${cat}. Customer: ${promptC.name}. Amount: INR ${promptC.amount}. Detail: ${promptC.detail}. Reason: ${promptC.reason}. Tone tier (1=friendly nudge, 4=final notice before human handoff): ${tone}. Language: ${locale === "hi-en" ? "Hinglish (Roman script, casual code-mixed Hindi/English)" : "English"}.`,
-      150);
+      `Category: ${promptC.category || cat}. Customer: ${promptC.name}. Amount: INR ${promptC.amount}. Detail: ${promptC.detail}. Reason: ${promptC.reason}. Tone tier (1=friendly nudge, 4=final notice before human handoff): ${tone}. Language: ${locale === "hi-en" ? "Hinglish (Roman script, casual code-mixed Hindi/English)" : "English"}.`,
+      1500);
   };
 
   const btnCls = "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-stone-950 text-xs font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed";
   const segCls = (active) => `px-2.5 py-1 rounded-md text-xs font-mono transition ${active ? "bg-stone-700 text-stone-100" : "text-stone-400 hover:text-stone-300"}`;
+  const selectCls = "w-full bg-stone-950 border border-stone-800 rounded-lg px-2.5 py-1.5 text-xs text-stone-200 focus:outline-none focus:border-stone-600 transition truncate";
 
   return (
     <div className="space-y-4">
-      
-
-      
-
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <LabCard icon={Sparkles} title="Diagnose an ambiguous decline" blurb="A subscription payment keeps failing with a decline code that gives no detail. Worth more patience, or a human look?">
-          <div className="text-[11px] text-stone-500 mb-3">{promptA.id ? `Using live case ${promptA.id} from your last batch` : "Using example data — no matching case in your last batch"}</div>
+        {/* Scenario A: Case Diagnosis */}
+        <LabCard icon={Sparkles} title="Diagnose an ambiguous decline" blurb="Select any case from your batch to run Gemini root cause analysis and next-best-action recommendation.">
+          <div className="space-y-3 mb-3">
+            <div>
+              <label className="block text-[10px] uppercase tracking-wider text-stone-400 mb-1">Select Case to Diagnose</label>
+              <select
+                className={selectCls}
+                value={selectedCaseIdA}
+                onChange={(e) => setSelectedCaseIdA(e.target.value)}
+              >
+                <option value="auto">Auto-select ({paymentCases.length > 0 ? "Ambiguous decline" : "Example case"})</option>
+                {paymentCases.length > 0 && (
+                  <optgroup label="Payment Failure Cases (from batch)">
+                    {paymentCases.map((c) => (
+                      <option key={c.event.id} value={c.event.id}>
+                        {c.event.id} · {c.event.customerName} · ₹{Math.round(c.event.amount).toLocaleString("en-IN")} · {c.event.signal?.declineCode || "failed"} ({c.attempts.length} attempts)
+                      </option>
+                    ))}
+                  </optgroup>
+                )}
+                {otherCases.length > 0 && (
+                  <optgroup label="Other Batch Cases">
+                    {otherCases.map((c) => (
+                      <option key={c.event.id} value={c.event.id}>
+                        {c.event.id} · {c.event.customerName} · {CATEGORY_LABEL[c.event.category] || c.event.category} · ₹{Math.round(c.event.amount).toLocaleString("en-IN")}
+                      </option>
+                    ))}
+                  </optgroup>
+                )}
+                <option value="custom">Custom Parameters (Manual Entry)...</option>
+              </select>
+            </div>
+
+            {selectedCaseIdA === "custom" ? (
+              <div className="p-2.5 bg-stone-950 border border-stone-800 rounded-lg space-y-2">
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-[9px] uppercase tracking-wider text-stone-400">Tenure (Mo)</label>
+                    <input
+                      type="number"
+                      min={0}
+                      className="w-full bg-stone-900 border border-stone-800 rounded px-2 py-1 text-xs text-stone-200 mt-0.5"
+                      value={customA.tenure}
+                      onChange={(e) => setCustomA(p => ({ ...p, tenure: Number(e.target.value) || 0 }))}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[9px] uppercase tracking-wider text-stone-400">Amount (INR)</label>
+                    <input
+                      type="number"
+                      min={1}
+                      className="w-full bg-stone-900 border border-stone-800 rounded px-2 py-1 text-xs text-stone-200 mt-0.5"
+                      value={customA.amount}
+                      onChange={(e) => setCustomA(p => ({ ...p, amount: Number(e.target.value) || 0 }))}
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-[9px] uppercase tracking-wider text-stone-400">Decline Code</label>
+                    <select
+                      className="w-full bg-stone-900 border border-stone-800 rounded px-2 py-1 text-xs text-stone-200 mt-0.5"
+                      value={customA.declineCode}
+                      onChange={(e) => setCustomA(p => ({ ...p, declineCode: e.target.value }))}
+                    >
+                      <option value="do_not_honor">do_not_honor</option>
+                      <option value="generic_decline">generic_decline</option>
+                      <option value="insufficient_funds">insufficient_funds</option>
+                      <option value="expired_card">expired_card</option>
+                      <option value="suspected_fraud">suspected_fraud</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-[9px] uppercase tracking-wider text-stone-400">Attempts</label>
+                    <input
+                      type="number"
+                      min={1}
+                      max={10}
+                      className="w-full bg-stone-900 border border-stone-800 rounded px-2 py-1 text-xs text-stone-200 mt-0.5"
+                      value={customA.attempts}
+                      onChange={(e) => setCustomA(p => ({ ...p, attempts: Number(e.target.value) || 1 }))}
+                    />
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="p-2.5 bg-stone-950 border border-stone-800 rounded-lg text-xs space-y-1">
+                <div className="flex items-center justify-between text-stone-400">
+                  <span className="text-stone-300 font-medium">{resolvedCaseA.customerName}</span>
+                  <span className="font-mono text-[10px] text-amber-400/90">{resolvedCaseA.id ? resolvedCaseA.id : "Example"}</span>
+                </div>
+                <div className="text-[11px] text-stone-400 leading-snug">
+                  ₹{Math.round(resolvedCaseA.amount).toLocaleString("en-IN")} · <span className="font-mono text-stone-300">{resolvedCaseA.code}</span> · {resolvedCaseA.attempts} attempts · {resolvedCaseA.gateway} · {resolvedCaseA.tenure}mo tenure
+                </div>
+              </div>
+            )}
+          </div>
+
           <button className={btnCls} onClick={runA} disabled={results.a?.loading}><Play size={12} /> Diagnose with Gemini</button>
           <ResultBox state={results.a} />
         </LabCard>
 
-        <LabCard icon={MessageSquare} title="Classify a customer reply" blurb="A finance manager replied to an overdue-invoice email. Promise to pay, dispute, or hardship - each routes differently.">
-          <div className="text-[11px] text-stone-500 mb-2">{promptB.id ? `Using live case ${promptB.id} from your last batch` : "Using example data — no matching case in your last batch"}</div>
-          <div className="text-xs text-stone-400 italic bg-stone-950 border border-stone-800 rounded-lg p-2.5 mb-3">&ldquo;{promptB.text}&rdquo;</div>
+        {/* Scenario B: Customer Reply */}
+        <LabCard icon={MessageSquare} title="Classify a customer reply" blurb="Select an accounts-receivable reply from your batch or enter a custom customer response to classify intent.">
+          <div className="space-y-2.5 mb-3">
+            <div>
+              <label className="block text-[10px] uppercase tracking-wider text-stone-400 mb-1">Select Case or Custom Text</label>
+              <select
+                className={selectCls}
+                value={selectedCaseIdB}
+                onChange={(e) => setSelectedCaseIdB(e.target.value)}
+              >
+                <option value="auto">Auto-select ({receivableCases.length > 0 ? "Receivable reply" : "Example reply"})</option>
+                {receivableCases.length > 0 && (
+                  <optgroup label="Receivable Cases (from batch)">
+                    {receivableCases.map((c) => (
+                      <option key={c.event.id} value={c.event.id}>
+                        {c.event.id} · {c.event.customerName} · ₹{Math.round(c.event.amount).toLocaleString("en-IN")}
+                      </option>
+                    ))}
+                  </optgroup>
+                )}
+                <option value="custom">Custom Reply Text...</option>
+              </select>
+            </div>
+
+            {selectedCaseIdB === "custom" ? (
+              <div>
+                <label className="block text-[9px] uppercase tracking-wider text-stone-400 mb-1">Reply Text to Classify</label>
+                <textarea
+                  rows={2}
+                  className="w-full bg-stone-950 border border-stone-800 rounded-lg p-2 text-xs text-stone-200 focus:outline-none focus:border-stone-600 resize-none"
+                  value={customReplyText}
+                  onChange={(e) => setCustomReplyText(e.target.value)}
+                />
+              </div>
+            ) : (
+              <div className="text-xs text-stone-400 italic bg-stone-950 border border-stone-800 rounded-lg p-2.5">
+                &ldquo;{promptB.text}&rdquo;
+              </div>
+            )}
+          </div>
+
           <button className={btnCls} onClick={runB} disabled={results.b?.loading}><Play size={12} /> Classify with Gemini</button>
           <ResultBox state={results.b} />
         </LabCard>
 
-        <LabCard icon={CreditCard} title="Draft the outreach message" blurb="Pick a category, tone, and language - Gemini writes the actual copy that would go out.">
-          <div className="text-[11px] text-stone-500 mb-3">{promptC.id ? `Using live case ${promptC.id} from your last batch` : "Using example data — no matching case in your last batch"}</div>
-          <div className="flex flex-wrap gap-1.5 mb-2">
-            {Object.entries(CATEGORY_LABEL).map(([k, v]) => <button key={k} className={segCls(cat === k)} onClick={() => setCat(k)}>{v}</button>)}
-          </div>
-          <div className="flex items-center gap-3 mb-3 flex-wrap">
-            <div className="flex items-center gap-1">
-              <span className="text-[11px] text-stone-400 font-mono mr-1">tone</span>
-              {[1, 2, 3, 4].map((t) => <button key={t} className={segCls(tone === t)} onClick={() => setTone(t)}>{t}</button>)}
+        {/* Scenario C: Outreach Message */}
+        <LabCard icon={CreditCard} title="Draft the outreach message" blurb="Pick a category, case, tone, and language - Gemini writes dynamic, empathetic recovery copy.">
+          <div className="space-y-2 mb-3">
+            <div className="flex flex-wrap gap-1.5">
+              {Object.entries(CATEGORY_LABEL).map(([k, v]) => (
+                <button
+                  key={k}
+                  className={segCls(cat === k)}
+                  onClick={() => {
+                    setCat(k);
+                    setSelectedCaseIdC("auto");
+                  }}
+                >
+                  {v}
+                </button>
+              ))}
             </div>
-            <div className="flex items-center gap-1">
-              <span className="text-[11px] text-stone-400 font-mono mr-1">lang</span>
-              <button className={segCls(locale === "en")} onClick={() => setLocale("en")}>English</button>
-              <button className={segCls(locale === "hi-en")} onClick={() => setLocale("hi-en")}>Hinglish</button>
+
+            {categoryCases.length > 0 && (
+              <div>
+                <label className="block text-[10px] uppercase tracking-wider text-stone-400 mb-1">Apply to Case (Optional)</label>
+                <select
+                  className={selectCls}
+                  value={selectedCaseIdC}
+                  onChange={(e) => setSelectedCaseIdC(e.target.value)}
+                >
+                  <option value="auto">Auto-select ({categoryCases.length} available)</option>
+                  {categoryCases.map((c) => (
+                    <option key={c.event.id} value={c.event.id}>
+                      {c.event.id} · {c.event.customerName} · ₹{Math.round(c.event.amount).toLocaleString("en-IN")}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            <div className="p-2 bg-stone-950 border border-stone-800 rounded-lg text-xs flex justify-between text-stone-400">
+              <span>Target: <strong className="text-stone-200">{promptC.name}</strong></span>
+              <span>₹{Math.round(promptC.amount).toLocaleString("en-IN")}</span>
+            </div>
+
+            <div className="flex items-center gap-3 flex-wrap pt-1">
+              <div className="flex items-center gap-1">
+                <span className="text-[11px] text-stone-400 font-mono mr-1">tone</span>
+                {[1, 2, 3, 4].map((t) => <button key={t} className={segCls(tone === t)} onClick={() => setTone(t)}>{t}</button>)}
+              </div>
+              <div className="flex items-center gap-1">
+                <span className="text-[11px] text-stone-400 font-mono mr-1">lang</span>
+                <button className={segCls(locale === "en")} onClick={() => setLocale("en")}>English</button>
+                <button className={segCls(locale === "hi-en")} onClick={() => setLocale("hi-en")}>Hinglish</button>
+              </div>
             </div>
           </div>
+
           <button className={btnCls} onClick={runC} disabled={results.c?.loading}><Play size={12} /> Draft with Gemini</button>
           <ResultBox state={results.c} />
         </LabCard>

@@ -49,7 +49,7 @@ async function startServer() {
               contents: [{ role: "user", parts: [{ text: user || "" }] }],
               config: {
                 systemInstruction: system || undefined,
-                maxOutputTokens: maxTokens ? Number(maxTokens) : 400,
+                maxOutputTokens: maxTokens ? Number(maxTokens) : 1500,
               },
             });
 
