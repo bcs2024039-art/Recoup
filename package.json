@@ -2,11 +2,17 @@
   "name": "recoup",
   "version": "1.0.0",
   "private": true,
+  "workspaces": ["frontend"],
   "scripts": {
-    "install:all": "cd frontend && npm install",
-    "dev": "cd frontend && npm run dev",
-    "dev:python": "cd backend && python -m uvicorn api:app --host 0.0.0.0 --port 8000 --reload",
-    "build": "cd frontend && npm run build",
-    "start": "cd frontend && npm start"
+    "dev:frontend": "npm run dev --workspace=frontend",
+    "dev:python": "cd backend && python3 -m uvicorn api:app --host 0.0.0.0 --port 8001",
+    "dev": "concurrently \"npm run dev:frontend\" \"npm run dev:python\"",
+    "build": "npm run build --workspace=frontend",
+    "start:frontend": "npm run start --workspace=frontend",
+    "start:python": "cd backend && python3 -m uvicorn api:app --host 0.0.0.0 --port 8001",
+    "start": "concurrently \"npm run start:frontend\" \"npm run start:python\""
+  },
+  "dependencies": {
+    "firebase": "^12.19.0"
   }
 }
