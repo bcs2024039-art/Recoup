@@ -1,0 +1,11 @@
+.vite
+node_modules/
+dist/
+.env
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+backend/__pycache__/
+backend/output/
+*.log
